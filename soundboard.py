@@ -12,10 +12,8 @@ class SoundboardApp:
         self.root = root
         self.sound_folder = sound_folder
         self.buttons = []
-        self.looping_sound = None
-        self.currently_playing = None
-        self.paused = False
-        self.current_volume_bar = None
+        self.sounds = {}  # Dictionary to store sounds and their volume bars
+        self.current_volume_bars = {}  # Track volume bars for each sound
 
         self.root.title("Soundboard")
         self.create_buttons()
@@ -36,63 +34,52 @@ class SoundboardApp:
         button.pack(side=tk.LEFT, padx=5)
 
         volume_bar = Scale(frame, from_=0, to=1, resolution=0.01, orient=tk.HORIZONTAL, label="Volume")
-        volume_bar.set(0.5)  # Default volume
+        volume_bar.set(1.0)  # Default volume
         volume_bar.pack(side=tk.RIGHT, padx=5)
 
         self.buttons.append((button, volume_bar))
 
     def toggle_play_pause(self, sound_file):
-        if self.currently_playing == sound_file and not self.paused:
-            self.pause_sound()
-        elif self.currently_playing == sound_file and self.paused:
-            self.resume_sound()
+        if sound_file in self.sounds:
+            self.stop_sound(sound_file)
         else:
             self.play_sound(sound_file)
 
     def play_sound(self, sound_file):
-        self.stop_looping_sound()
         sound_path = os.path.join(self.sound_folder, sound_file)
-        sound = pygame.mixer.Sound(sound_path)
-        self.currently_playing = sound_file
-        self.paused = False
+        if sound_file not in self.sounds:
+            sound = pygame.mixer.Sound(sound_path)
+            self.sounds[sound_file] = sound
 
         # Set initial volume from the corresponding volume bar
         for button, volume_bar in self.buttons:
             if button.cget("text") == sound_file:
-                sound.set_volume(volume_bar.get())
-                self.current_volume_bar = volume_bar  # Track the volume bar for the current sound
+                self.sounds[sound_file].set_volume(volume_bar.get())
+                self.current_volume_bars[sound_file] = volume_bar  # Track the volume bar for this sound
 
-        sound.play()
-        self.looping_sound = sound
+        self.sounds[sound_file].play(loops=-1)  # Play sound in a loop
 
         # Start updating the volume dynamically
-        self.update_volume()
+        self.update_volume(sound_file)
 
-    def update_volume(self):
-        if self.looping_sound and self.current_volume_bar:
+    def update_volume(self, sound_file):
+        if sound_file in self.sounds and sound_file in self.current_volume_bars:
             # Continuously update the volume based on the volume bar's value
-            self.looping_sound.set_volume(self.current_volume_bar.get())
-            self.root.after(100, self.update_volume)  # Check again after 100ms
+            self.sounds[sound_file].set_volume(self.current_volume_bars[sound_file].get())
+            self.root.after(100, lambda: self.update_volume(sound_file))  # Check again after 100ms
 
-    def pause_sound(self):
-        if self.looping_sound:
-            pygame.mixer.pause()
-            self.paused = True
+    def stop_sound(self, sound_file):
+        if sound_file in self.sounds:
+            self.sounds[sound_file].stop()
+            del self.sounds[sound_file]
+            del self.current_volume_bars[sound_file]
 
-    def resume_sound(self):
-        if self.looping_sound:
-            pygame.mixer.unpause()
-            self.paused = False
-
-    def stop_looping_sound(self):
-        if self.looping_sound:
-            self.looping_sound.stop()
-            self.looping_sound = None
-            self.currently_playing = None
-            self.paused = False
+    def stop_all_sounds(self):
+        for sound_file in list(self.sounds.keys()):
+            self.stop_sound(sound_file)
 
     def on_close(self):
-        self.stop_looping_sound()
+        self.stop_all_sounds()
         pygame.mixer.quit()
         self.root.destroy()
 
