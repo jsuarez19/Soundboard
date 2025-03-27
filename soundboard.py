@@ -15,6 +15,7 @@ class SoundboardApp:
         self.looping_sound = None
         self.currently_playing = None
         self.paused = False
+        self.current_volume_bar = None
 
         self.root.title("Soundboard")
         self.create_buttons()
@@ -55,13 +56,23 @@ class SoundboardApp:
         self.currently_playing = sound_file
         self.paused = False
 
-        # Set volume from the corresponding volume bar
+        # Set initial volume from the corresponding volume bar
         for button, volume_bar in self.buttons:
             if button.cget("text") == sound_file:
                 sound.set_volume(volume_bar.get())
+                self.current_volume_bar = volume_bar  # Track the volume bar for the current sound
 
         sound.play()
         self.looping_sound = sound
+
+        # Start updating the volume dynamically
+        self.update_volume()
+
+    def update_volume(self):
+        if self.looping_sound and self.current_volume_bar:
+            # Continuously update the volume based on the volume bar's value
+            self.looping_sound.set_volume(self.current_volume_bar.get())
+            self.root.after(100, self.update_volume)  # Check again after 100ms
 
     def pause_sound(self):
         if self.looping_sound:
